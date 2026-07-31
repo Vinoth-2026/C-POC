@@ -5,31 +5,34 @@
 
 #define CPU_UTIL_PATH      "/proc/stat"
 #define MEMORY_USAGE_PATH  "/proc/meminfo"
-#define THROUGHPUT_PATH    "/proc/net/dev"
+#define NET_DEV_PATH       "/proc/net/dev"
+#define WIRELESS_PATH      "/proc/net/wireless"
+#define LOADAVG_PATH       "/proc/loadavg"
 
-typedef struct
-{
+#define TARGET_5GC_AMF     "10.0.0.1"   
+#define TARGET_PUBLIC      "8.8.8.8"    
+
+typedef struct {
     unsigned long long total_time;
     unsigned long long idle_time;
-} cpu_time;
+} cpu_time_t;
 
-typedef struct
-{
-    unsigned long long rx;
-    unsigned long long tx;
-    double rx_packetloss;
-    double tx_packetloss;
-} throughput;
+typedef struct {
+    unsigned long long rx_bytes;
+    unsigned long long tx_bytes;
+    unsigned long long rx_packets;
+    unsigned long long tx_packets;
+    unsigned long long rx_errors;
+    unsigned long long tx_errors;
+    unsigned long long rx_dropped;
+    unsigned long long tx_dropped;
+} interface_stats_t;
 
-int get_cpu_time(cpu_time *reading);
-void *get_cpu_utilization(void *arg);
-void *get_memory_usage(void *arg);
-int get_throughput_packetloss(unsigned long long *rx,
-                              unsigned long long *tx,
-                              double *rx_loss,
-                              double *tx_loss);
-void *calculate_throughput_packetloss(void *arg);
-void *get_latency(void *arg);
-void collect_KPI(Record *R);
+typedef struct {
+    long throughput_bps;
+    unsigned short packet_loss_percentage;
+} network_kpi_t;
+
+void collect_5G_KPIs(Record *R);
 
 #endif

@@ -1,428 +1,116 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
-
+#include <math.h>
 #include "Analytics.h"
+#include "DataCollection.h"
 
-#define CPU_LIMIT        90
-#define MEMORY_LIMIT     80
-#define LATENCY_LIMIT    100
-#define PACKET_LIMIT     2
-
-void generate_analytics(char *recordFile)
-{
-    FILE *fp = fopen(recordFile, "r");
-    if (fp == NULL)
-    {
-        printf("No records available\n");
-        return;
-    }
-
-    Record R;
-    Analytics A = {0};
-    double cpu_sum = 0.0;
-    double mem_sum = 0.0;
-    double latency_sum = 0.0;
-    double packet_sum = 0.0;
-    long throughput_sum = 0;
-
-    A.min_cpu = 999.0;
-    A.min_memory = 999.0;
-    A.min_latency = 999999;
-    A.min_throughput = 999999999;
-
-    while (fscanf(fp, "%d,%hu,%ld,%lf,%lf,%hd",
-                  &R.latency,
-                  &R.packet_loss,
-                  &R.through_put,
-                  &R.cpu_usage,
-                  &R.memory_usage,
-                  &R.signal_strength) == 6)
-    {
-        A.samples++;
-        cpu_sum += R.cpu_usage;
-        mem_sum += R.memory_usage;
-        latency_sum += R.latency;
-        packet_sum += R.packet_loss;
-        throughput_sum += R.through_put;
-
-        if (R.cpu_usage > A.max_cpu)
-        {
-            A.max_cpu = R.cpu_usage;
-        }
-
-        if (R.cpu_usage < A.min_cpu)
-        {
-            A.min_cpu = R.cpu_usage;
-        }
-
-        if (R.memory_usage > A.max_memory)
-        {
-            A.max_memory = R.memory_usage;
-        }
-
-        if (R.memory_usage < A.min_memory)
-        {
-            A.min_memory = R.memory_usage;
-        }
-
-        if (R.latency > A.max_latency)
-        {
-            A.max_latency = R.latency;
-        }
-
-        if (R.latency < A.min_latency)
-        {
-            A.min_latency = R.latency;
-        }
-
-        if (R.through_put > A.max_throughput)
-        {
-            A.max_throughput = R.through_put;
-        }
-
-        if (R.through_put < A.min_throughput)
-        {
-            A.min_throughput = R.through_put;
-        }
-
-        if (R.cpu_usage > CPU_LIMIT)
-        {
-            A.cpu_alerts++;
-        }
-
-        if (R.memory_usage > MEMORY_LIMIT)
-        {
-            A.memory_alerts++;
-        }
-
-        if (R.latency > LATENCY_LIMIT)
-        {
-            A.latency_alerts++;
-        }
-
-        if (R.packet_loss > PACKET_LIMIT)
-        {
-            A.packetloss_alerts++;
-        }
-    }
-
+static void read_system_uptime(char *buffer, size_t buf_len) {
+    FILE *fp = fopen("/proc/uptime", "r");
+    if (!fp) { snprintf(buffer, buf_len, "N/A"); return; }
+    double uptime_seconds;
+    if (fscanf(fp, "%lf", &uptime_seconds) == 1) {
+        long long seconds = (long long)uptime_seconds;
+        snprintf(buffer, buf_len, "%lld Hours, %d Mins, %d Secs", seconds/3600, (int)(seconds%3600)/60, (int)seconds%60);
+    } else snprintf(buffer, buf_len, "Parse Error");
     fclose(fp);
-
-    if (A.samples == 0)
-    {
-        return;
-    }
-
-    A.avg_cpu = cpu_sum / A.samples;
-    A.avg_memory = mem_sum / A.samples;
-    A.avg_latency = latency_sum / A.samples;
-    A.avg_packetloss = packet_sum / A.samples;
-    A.avg_throughput = throughput_sum / A.samples;
-
-    FILE *out = fopen("Analytics.txt", "w");
-    if (out == NULL)
-    {
-        return;
-    }
-
-    fprintf(out,
-            "=====================================\n"
-            " NETWORK ANALYTICS REPORT\n"
-            "=====================================\n\n");
-
-    fprintf(out, "Total Samples : %d\n\n", A.samples);
-
-    fprintf(out,
-            "CPU Usage\n"
-            "Average : %.2lf %%\n"
-            "Minimum : %.2lf %%\n"
-            "Maximum : %.2lf %%\n\n",
-            A.avg_cpu,
-            A.min_cpu,
-            A.max_cpu);
-
-    fprintf(out,
-            "Memory Usage\n"
-            "Average : %.2lf %%\n"
-            "Minimum : %.2lf %%\n"
-            "Maximum : %.2lf %%\n\n",
-            A.avg_memory,
-            A.min_memory,
-            A.max_memory);
-
-    fprintf(out,
-            "Latency\n"
-            "Average : %.2lf ms\n"
-            "Minimum : %d ms\n"
-            "Maximum : %d ms\n\n",
-            A.avg_latency,
-            A.min_latency,
-            A.max_latency);
-
-    fprintf(out,
-            "Throughput\n"
-            "Average : %ld Bytes/sec\n"
-            "Minimum : %ld Bytes/sec\n"
-            "Maximum : %ld Bytes/sec\n\n",
-            A.avg_throughput,
-            A.min_throughput,
-            A.max_throughput);
-
-    fprintf(out,
-            "Packet Loss Average : %.2lf %%\n\n",
-            A.avg_packetloss);
-
-    fprintf(out,
-            "Alerts\n"
-            "CPU High       : %d\n"
-            "Memory High    : %d\n"
-            "Latency High   : %d\n"
-            "Packet Loss    : %d\n",
-            A.cpu_alerts,
-            A.memory_alerts,
-            A.latency_alerts,
-            A.packetloss_alerts);
-
-    fclose(out);
 }
 
-//------------------------------------------------
-// Trend Report
-//------------------------------------------------
-
-void generate_trend_report(char *recordFile)
-{
-    FILE *fp = fopen(recordFile, "r");
-    if (fp == NULL)
-    {
-        return;
-    }
-
-    Record first = {0};
-    Record last = {0};
-
-    if (fscanf(fp, "%d,%hu,%ld,%lf,%lf,%hd",
-               &first.latency,
-               &first.packet_loss,
-               &first.through_put,
-               &first.cpu_usage,
-               &first.memory_usage,
-               &first.signal_strength) != 6)
-    {
-        fclose(fp);
-        return;
-    }
-
-    while (fscanf(fp, "%d,%hu,%ld,%lf,%lf,%hd",
-                  &last.latency,
-                  &last.packet_loss,
-                  &last.through_put,
-                  &last.cpu_usage,
-                  &last.memory_usage,
-                  &last.signal_strength) == 6)
-    {
-        /* Loop to the last record */
-    }
-
+static void read_system_load_averages(char *buffer, size_t buf_len) {
+    FILE *fp = fopen("/proc/loadavg", "r");
+    if (!fp) { snprintf(buffer, buf_len, "N/A"); return; }
+    double l1, l5, l15;
+    if (fscanf(fp, "%lf %lf %lf", &l1, &l5, &l15) == 3) {
+        snprintf(buffer, buf_len, "1m: %.2f, 5m: %.2f, 15m: %.2f", l1, l5, l15);
+    } else snprintf(buffer, buf_len, "Parse Error");
     fclose(fp);
-
-    FILE *out = fopen("Trend_Report.txt", "w");
-    if (out == NULL)
-    {
-        return;
-    }
-
-    fprintf(out, "========= TREND REPORT =========\n\n");
-    fprintf(out,
-            "CPU Trend : %s\n",
-            (last.cpu_usage > first.cpu_usage) ? "Increasing" : "Decreasing");
-    fprintf(out,
-            "Memory Trend : %s\n",
-            (last.memory_usage > first.memory_usage) ? "Increasing" : "Decreasing");
-    fprintf(out,
-            "Latency Trend : %s\n",
-            (last.latency > first.latency) ? "Increasing" : "Decreasing");
-    fprintf(out,
-            "Throughput Trend : %s\n",
-            (last.through_put > first.through_put) ? "Increasing" : "Decreasing");
-
-    fclose(out);
 }
 
-//------------------------------------------------
-// Health Report
-//------------------------------------------------
-
-void generate_health_report(char *recordFile)
-{
-    FILE *fp = fopen(recordFile, "r");
-    if (fp == NULL)
-    {
-        return;
-    }
-
-    Record R;
-    double cpu = 0.0;
-    double mem = 0.0;
-    double latency = 0.0;
-    int count = 0;
-
-    while (fscanf(fp, "%d,%hu,%ld,%lf,%lf,%hd",
-                  &R.latency,
-                  &R.packet_loss,
-                  &R.through_put,
-                  &R.cpu_usage,
-                  &R.memory_usage,
-                  &R.signal_strength) == 6)
-    {
-        cpu += R.cpu_usage;
-        mem += R.memory_usage;
-        latency += R.latency;
-        count++;
-    }
-
-    fclose(fp);
-
-    if (count == 0)
-    {
-        return;
-    }
-
-    cpu /= count;
-    mem /= count;
-    latency /= count;
-
-    int score = 100;
-    if (cpu > 80.0)
-    {
-        score -= 20;
-    }
-
-    if (mem > 80.0)
-    {
-        score -= 20;
-    }
-
-    if (latency > 100.0)
-    {
-        score -= 30;
-    }
-
-    FILE *out = fopen("Health_Report.txt", "w");
-    if (out == NULL)
-    {
-        return;
-    }
-
-    fprintf(out,
-            "======== SYSTEM HEALTH ========\n\n"
-            "CPU Score      : %.2lf\n"
-            "Memory Score   : %.2lf\n"
-            "Latency Score  : %.2lf\n\n"
-            "Overall Health : %d /100\n",
-            100.0 - cpu,
-            100.0 - mem,
-            100.0 - (latency / 2.0),
-            score);
-
-    fclose(out);
+static int parse_storage_line(const char *line, Record *R) {
+    return sscanf(line, "%lu,%19[^,],%d,%hu,%ld,%lf,%lf,%hd",
+                  &R->record_id, R->timestamp, &R->latency, &R->packet_loss,
+                  &R->through_put, &R->cpu_usage, &R->memory_usage, &R->signal_strength) == 8;
 }
 
-//------------------------------------------------
-// Alert Report
-//------------------------------------------------
+void run_analytics_pipeline(void) {
+    FILE *fp = fopen(RECORD_FILE, "r");
+    if (!fp) return;
+    TelcoAnalytics A = {0};
+    A.cpu.min = 100.0; A.mem.min = 100.0; A.latency.min = 9999.0; A.throughput.min = 9999999.0;
+    char line[256];
+    double cpu_sum=0, mem_sum=0, lat_sum=0, tp_sum=0, pl_sum=0;
 
-void generate_alert_report(char *recordFile)
-{
-    FILE *fp = fopen(recordFile, "r");
-    if (fp == NULL)
-    {
-        return;
+    while (fgets(line, sizeof(line), fp)) {
+        Record R;
+        if (!parse_storage_line(line, &R)) continue;
+        A.total_samples++;
+        cpu_sum += R.cpu_usage; mem_sum += R.memory_usage; lat_sum += R.latency; tp_sum += R.through_put; pl_sum += R.packet_loss;
+
+        if (R.cpu_usage > A.cpu.max) { A.cpu.max = R.cpu_usage; A.cpu.peak_id = R.record_id; strcpy(A.cpu.peak_time, R.timestamp); }
+        if (R.cpu_usage < A.cpu.min) A.cpu.min = R.cpu_usage;
+        if (R.memory_usage > A.mem.max) { A.mem.max = R.memory_usage; A.mem.peak_id = R.record_id; strcpy(A.mem.peak_time, R.timestamp); }
+        if (R.memory_usage < A.mem.min) A.mem.min = R.memory_usage;
+        if (R.latency > A.latency.max) { A.latency.max = R.latency; A.latency.peak_id = R.record_id; strcpy(A.latency.peak_time, R.timestamp); }
+        if (R.latency < A.latency.min) A.latency.min = R.latency;
+        if (R.through_put > A.throughput.max) { A.throughput.max = R.through_put; A.throughput.peak_id = R.record_id; strcpy(A.throughput.peak_time, R.timestamp); }
+        if (R.through_put < A.throughput.min) A.throughput.min = R.through_put;
+
+        if (R.cpu_usage > CPU_LIMIT) A.cpu_alerts++;
+        if (R.memory_usage > MEMORY_LIMIT) A.mem_alerts++;
+        if (R.latency > LATENCY_LIMIT) A.latency_alerts++;
+        if (R.packet_loss > PACKET_LIMIT) A.packet_alerts++;
     }
 
-    FILE *out = fopen("Alerts.txt", "w");
-    if (out == NULL)
-    {
-        fclose(fp);
-        return;
+    if (A.total_samples == 0) { fclose(fp); return; }
+    A.cpu.avg = cpu_sum / A.total_samples; A.mem.avg = mem_sum / A.total_samples;
+    A.latency.avg = lat_sum / A.total_samples; A.throughput.avg = tp_sum / A.total_samples;
+    A.avg_packet_loss = pl_sum / A.total_samples;
+
+    rewind(fp);
+    double c_var=0, m_var=0, l_var=0, t_var=0;
+    while (fgets(line, sizeof(line), fp)) {
+        Record R; if (!parse_storage_line(line, &R)) continue;
+        c_var += pow(R.cpu_usage - A.cpu.avg, 2); m_var += pow(R.memory_usage - A.mem.avg, 2);
+        l_var += pow(R.latency - A.latency.avg, 2); t_var += pow(R.through_put - A.throughput.avg, 2);
     }
-
-    Record R;
-    while (fscanf(fp, "%d,%hu,%ld,%lf,%lf,%hd",
-                  &R.latency,
-                  &R.packet_loss,
-                  &R.through_put,
-                  &R.cpu_usage,
-                  &R.memory_usage,
-                  &R.signal_strength) == 6)
-    {
-        if (R.cpu_usage > CPU_LIMIT)
-        {
-            fprintf(out, "CPU HIGH : %.2lf%%\n", R.cpu_usage);
-        }
-
-        if (R.memory_usage > MEMORY_LIMIT)
-        {
-            fprintf(out, "MEMORY HIGH : %.2lf%%\n", R.memory_usage);
-        }
-
-        if (R.latency > LATENCY_LIMIT)
-        {
-            fprintf(out, "LATENCY HIGH : %d ms\n", R.latency);
-        }
-
-        if (R.packet_loss > PACKET_LIMIT)
-        {
-            fprintf(out, "PACKET LOSS HIGH : %hu%%\n", R.packet_loss);
-        }
-    }
-
     fclose(fp);
-    fclose(out);
-}
 
-//------------------------------------------------
-// CSV Export
-//------------------------------------------------
+    A.cpu.std_dev = sqrt(c_var/A.total_samples); A.mem.std_dev = sqrt(m_var/A.total_samples);
+    A.latency.std_dev = sqrt(l_var/A.total_samples); A.throughput.std_dev = sqrt(t_var/A.total_samples);
 
-void export_csv(char *recordFile)
-{
-    FILE *in = fopen(recordFile, "r");
-    if (in == NULL)
-    {
-        return;
+    char uptime[64], load[64];
+    read_system_uptime(uptime, sizeof(uptime));
+    read_system_load_averages(load, sizeof(load));
+
+    FILE *out = fopen("reports/Analytics.txt", "w");
+    if (out) {
+        fprintf(out, "=========================================================\n"
+                     "        5G TELECOM KPI SYSTEM ANALYTICS REPORT           \n"
+                     "=========================================================\n\n"
+                     "HOST LINUX METRICS:\n -> Uptime    : %s\n -> Load Avg  : %s\n\n"
+                     "TOTAL SAMPLES TRACED: %d\n\n", uptime, load, A.total_samples);
+        fprintf(out, "CPU PROFILE:\n -> Avg: %.2f%%\n -> Peak: %.2f%% (ID %lu at %s)\n -> StdDev: %.2f\n\n", A.cpu.avg, A.cpu.max, A.cpu.peak_id, A.cpu.peak_time, A.cpu.std_dev);
+        fprintf(out, "LATENCY PROFILE:\n -> Avg: %.2f ms\n -> Peak: %.2f ms (ID %lu at %s)\n -> StdDev: %.2f\n\n", A.latency.avg, A.latency.max, A.latency.peak_id, A.latency.peak_time, A.latency.std_dev);
+        fprintf(out, "THROUGHPUT PROFILE:\n -> Avg: %.2f bps\n -> Peak: %.2f bps (ID %lu at %s)\n -> StdDev: %.2f\n\n", A.throughput.avg, A.throughput.max, A.throughput.peak_id, A.throughput.peak_time, A.throughput.std_dev);
+        fprintf(out, "PACKET LOSS OVERVIEW:\n -> Avg Loss Rate: %.2f%%\n", A.avg_packet_loss);
+        fclose(out);
     }
 
-    FILE *out = fopen("Export.csv", "w");
-    if (out == NULL)
-    {
-        fclose(in);
-        return;
+    FILE *csv = fopen("reports/Export.csv", "w");
+    if (csv) {
+        fprintf(csv, "RecordID,Timestamp,LatencyMs,PacketLossPct,ThroughputBps,CpuUsagePct,MemoryUsagePct,SignalDbm\n");
+        fp = fopen(RECORD_FILE, "r");
+        while (fgets(line, sizeof(line), fp)) {
+            Record R; if (parse_storage_line(line, &R))
+                fprintf(csv, "%lu,%s,%d,%hu,%ld,%.2lf,%.2lf,%hd\n", R.record_id, R.timestamp, R.latency, R.packet_loss, R.through_put, R.cpu_usage, R.memory_usage, R.signal_strength);
+        }
+        fclose(fp); fclose(csv);
     }
 
-    fprintf(out, "Latency,PacketLoss,Throughput,CPU,Memory,Signal\n");
-
-    Record R;
-    while (fscanf(in, "%d,%hu,%ld,%lf,%lf,%hd",
-                  &R.latency,
-                  &R.packet_loss,
-                  &R.through_put,
-                  &R.cpu_usage,
-                  &R.memory_usage,
-                  &R.signal_strength) == 6)
-    {
-        fprintf(out,
-                "%d,%hu,%ld,%.2lf,%.2lf,%hd\n",
-                R.latency,
-                R.packet_loss,
-                R.through_put,
-                R.cpu_usage,
-                R.memory_usage,
-                R.signal_strength);
+    FILE *al = fopen("reports/Alerts.txt", "w");
+    if (al) {
+        fprintf(al, "=== SLA ALERT STATISTICS ===\n\nCPU Breaches: %d\nMem Breaches: %d\nLatency Breaches: %d\nPacket Breaches: %d\n", A.cpu_alerts, A.mem_alerts, A.latency_alerts, A.packet_alerts);
+        fclose(al);
     }
-
-    fclose(in);
-    fclose(out);
+    printf("\nTelemetry Reports generated inside 'reports/'.\n");
 }

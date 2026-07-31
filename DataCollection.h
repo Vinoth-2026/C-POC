@@ -1,8 +1,13 @@
 #ifndef DATA_COLLECTION_H
 #define DATA_COLLECTION_H
 
-typedef struct
-{
+#define TIMESTAMP_LEN 20
+#define RECORD_FILE   "data/Records.txt"
+#define QUEUE_FILE    "data/Queue.dat"
+
+typedef struct {
+    unsigned long record_id;
+    char timestamp[TIMESTAMP_LEN];
     int latency;
     unsigned short packet_loss;
     long through_put;
@@ -11,8 +16,7 @@ typedef struct
     short signal_strength;
 } Record;
 
-typedef struct DLL
-{
+typedef struct DLL {
     Record R;
     struct DLL *next;
     struct DLL *prev;
@@ -20,14 +24,13 @@ typedef struct DLL
 
 extern DLL *front;
 extern DLL *rear;
-extern int count;
+extern int system_record_count;
 
-void get_data(Record *R);
-void display(Record *R);
-void enqueue(Record *R);
-void queue_display(void);
+void display_record(const Record *R);
+void enqueue_record(const Record *R);
+void display_queue(void);
 void free_queue(void);
-void store_data(Record *R, char *filename);
-void update_count(void);
+void write_record_to_storage(const Record *R, const char *filename);
+void synchronization_counter(void);
 
 #endif

@@ -3,33 +3,34 @@
 
 #include "DataCollection.h"
 
-typedef struct
-{
-    int samples;
-    double avg_cpu;
-    double avg_memory;
-    double avg_latency;
-    double avg_packetloss;
-    long avg_throughput;
-    double max_cpu;
-    double min_cpu;
-    double max_memory;
-    double min_memory;
-    int max_latency;
-    int min_latency;
-    long max_throughput;
-    long min_throughput;
-    int cpu_alerts;
-    int memory_alerts;
-    int latency_alerts;
-    int packetloss_alerts;
-    int health_score;
-} Analytics;
+#define CPU_LIMIT        85.0
+#define MEMORY_LIMIT     80.0
+#define LATENCY_LIMIT    100
+#define PACKET_LIMIT     2
 
-void generate_analytics(char *recordFile);
-void generate_trend_report(char *recordFile);
-void generate_health_report(char *recordFile);
-void generate_alert_report(char *recordFile);
-void export_csv(char *recordFile);
+typedef struct {
+    double avg;
+    double min;
+    double max;
+    double variance;
+    double std_dev;
+    unsigned long peak_id;
+    char peak_time[20];
+} StatMetric;
+
+typedef struct {
+    int total_samples;
+    StatMetric cpu;
+    StatMetric mem;
+    StatMetric latency;
+    StatMetric throughput;
+    double avg_packet_loss;
+    int cpu_alerts;
+    int mem_alerts;
+    int latency_alerts;
+    int packet_alerts;
+} TelcoAnalytics;
+
+void run_analytics_pipeline(void);
 
 #endif

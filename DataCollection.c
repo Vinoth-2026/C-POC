@@ -1,136 +1,97 @@
 #include <stdio.h>
 #include <stdlib.h>
-
+#include <string.h>
 #include "DataCollection.h"
 
 DLL *front = NULL;
 DLL *rear = NULL;
-int count = 0;
+int system_record_count = 0;
 
-void get_data(Record *R)
-{
-    printf("\nEnter KPI Parameters\n");
-
-    printf("Latency : ");
-    scanf("%d", &R->latency);
-
-    printf("Packet Loss : ");
-    scanf("%hu", &R->packet_loss);
-
-    printf("Throughput : ");
-    scanf("%ld", &R->through_put);
-
-    printf("CPU Usage : ");
-    scanf("%lf", &R->cpu_usage);
-
-    printf("Memory Usage : ");
-    scanf("%lf", &R->memory_usage);
-
-    printf("Signal Strength : ");
-    scanf("%hd", &R->signal_strength);
+void display_record(const Record *R) {
+    printf("\n========================================\n");
+    printf(" RECORD ID       : %lu\n", R->record_id);
+    printf(" TIMESTAMP       : %s\n", R->timestamp);
+    printf("----------------------------------------\n");
+    printf(" Latency         : %d ms\n", R->latency);
+    printf(" Packet Loss     : %hu %%\n", R->packet_loss);
+    printf(" Throughput      : %ld Bits/s\n", R->through_put);
+    printf(" CPU Usage       : %.2lf %%\n", R->cpu_usage);
+    printf(" Memory Usage    : %.2lf %%\n", R->memory_usage);
+    if (R->signal_strength == -999) {
+        printf(" Signal Strength : N/A (Ethernet Interface)\n");
+    } else {
+        printf(" Signal Strength : %hd dBm\n", R->signal_strength);
+    }
+    printf("========================================\n");
 }
 
-void display(Record *R)
-{
-    printf("\n-----------------------\n");
-    printf("Latency          : %d ms\n", R->latency);
-    printf("Packet Loss      : %hu %%\n", R->packet_loss);
-    printf("Throughput       : %ld Bytes/s\n", R->through_put);
-    printf("CPU Usage        : %.2lf %%\n", R->cpu_usage);
-    printf("Memory Usage     : %.2lf %%\n", R->memory_usage);
-    printf("Signal Strength  : %hd dBm\n", R->signal_strength);
-    printf("-----------------------\n");
-}
-
-void enqueue(Record *R)
-{
-    DLL *newNode = malloc(sizeof *newNode);
-    if (newNode == NULL)
-    {
-        printf("Memory Allocation Failed\n");
+void enqueue_record(const Record *R) {
+    DLL *newNode = malloc(sizeof(*newNode));
+    if (!newNode) {
+        perror("ERR: Queue alloc failure");
         return;
     }
-
     newNode->R = *R;
     newNode->next = NULL;
     newNode->prev = NULL;
 
-    if (front == NULL)
-    {
+    if (!front) {
         front = rear = newNode;
-    }
-    else
-    {
+    } else {
         rear->next = newNode;
         newNode->prev = rear;
         rear = newNode;
     }
 }
 
-void queue_display(void)
-{
-    printf("\nQUEUE DATA\n");
-    for (DLL *temp = front; temp != NULL; temp = temp->next)
-    {
-        display(&temp->R);
+void display_queue(void) {
+    if (!front) {
+        printf("\nQueue is currently empty.\n");
+        return;
+    }
+    printf("\n--- CURRENT ACTIVE MEMORY QUEUE ---\n");
+    DLL *current = front;
+    while (current) {
+        display_record(&current->R);
+        current = current->next;
     }
 }
 
-void free_queue(void)
-{
-    DLL *temp = NULL;
-    while (front != NULL)
-    {
-        temp = front;
-        front = front->next;
-        free(temp);
+void free_queue(void) {
+    DLL *current = front;
+    while (current) {
+        DLL *next = current->next;
+        free(current);
+        current = next;
     }
-
-    rear = NULL;
+    front = rear = NULL;
 }
 
-void store_data(Record *R, char *filename)
-{
+void write_record_to_storage(const Record *R, const char *filename) {
     FILE *fp = fopen(filename, "a");
-    if (fp == NULL)
-    {
-        printf("File open error\n");
+    if (!fp) {
+        perror("ERR: Can't append record file");
         return;
     }
-
-    fprintf(fp, "%d,%hu,%ld,%.2lf,%.2lf,%hd\n",
-            R->latency,
-            R->packet_loss,
-            R->through_put,
-            R->cpu_usage,
-            R->memory_usage,
-            R->signal_strength);
-
+    fprintf(fp, "%lu,%s,%d,%hu,%ld,%.2lf,%.2lf,%hd\n",
+            R->record_id, R->timestamp, R->latency, R->packet_loss,
+            R->through_put, R->cpu_usage, R->memory_usage, R->signal_strength);
     fclose(fp);
-    count++;
+    system_record_count++;
 }
 
-void update_count(void)
-{
-    FILE *fp = fopen("Records.txt", "r");
-    if (fp == NULL)
-    {
-        count = 0;
+void synchronization_counter(void) {
+    FILE *fp = fopen(RECORD_FILE, "r");
+    if (!fp) {
+        system_record_count = 0;
         return;
     }
-
-    Record R;
-    count = 0;
-    while (fscanf(fp, "%d,%hu,%ld,%lf,%lf,%hd",
-                  &R.latency,
-                  &R.packet_loss,
-                  &R.through_put,
-                  &R.cpu_usage,
-                  &R.memory_usage,
-                  &R.signal_strength) == 6)
-    {
-        count++;
+    system_record_count = 0;
+    char line[256];
+    while (fgets(line, sizeof(line), fp)) {
+        if (strlen(line) > 5) {
+            system_record_count++;
+        }
     }
-
     fclose(fp);
 }
