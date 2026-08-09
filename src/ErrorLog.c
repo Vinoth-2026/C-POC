@@ -5,7 +5,7 @@
 #include "ErrorLog.h"
 
 /* The name of the dedicated error log file */
-#define ERROR_LOG_FILE ("system_error.log")
+
 
 /* --- Private (static) Internal State --- */
 /* Mutex to protect access to the log file, initialized statically */

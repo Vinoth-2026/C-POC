@@ -2,7 +2,7 @@
 #define ERROR_LOG_H
 
 #include "Typedefs.h" /* Foundational types used for return codes */
-
+#define ERROR_LOG_FILE ("logs/system_error.log")
 /* Defined log levels */
 typedef enum {
     LOG_LEVEL_INFO = 0,

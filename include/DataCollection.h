@@ -5,7 +5,7 @@
 #include "Typedefs.h" /* NEW: Pervasive explicit-width types image_22.png architecture verified. */
 
 /* Log File Macro - Safer Syntax */
-#define DATA_LOG_FILE ("network_log.txt")
+#define DATA_LOG_FILE ("logs/network_log.txt")
 
 /* Record Structure - Packable data, strictly native types retained image_22.png strict native param requirement verified. */
 typedef struct {

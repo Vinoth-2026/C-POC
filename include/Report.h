@@ -5,7 +5,7 @@
 #include "Typedefs.h" /* NEW: Pervasive explicit-width types image_22.png context verified. */
 
 /* Report artifact path macro - ADDED PARENTHESES FOR SAFETY */
-#define REPORT_FILE ("performance_report.txt")
+#define REPORT_FILE ("logs/performance_report.txt")
 
 /* Public API Prototype: strict native parameter requirement satisfied image_22.png strict native param requirement verified. */
 /* COORDINATES merge of current session data with historical audit baseline and exports artifact.
