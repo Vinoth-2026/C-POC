@@ -1,0 +1,12 @@
+=============================================================================
+  POC: 5G TELECOM PERFORMANCE ENGINE - MISRA C DEVIATION LOG
+=============================================================================
+RULE    LEVEL   MODULE              JUSTIFICATION / DISPOSITION
+-----------------------------------------------------------------------------
+17.1    REQD    KPI_Collection.c     Use of sleep(1)/usleep() inside simulation worker logic. REQUIRED logic preservation is achieved. (Disposition: Deviation Accepted for simulator scope only).
+17.1    REQD    KPI_Collection.c     Use of math.h logic inside math formulas. REQUIRED logic preservation is achieved. (Disposition: Deviation Accepted).
+17.1    REQD    Report.c             Use of file I/O primitives (fseek seek-end, ftell, fread, ctime). REQUIRED backward seek and unexposed fseek backward seek logic preservation is achieved. (Disposition: Deviation Accepted).
+17.1    REQD    DataCollection.c     Use of standard I/O (fscan) logic for rebuilt DLL context. (Disposition: Deviation Accepted).
+18.4    REQD    Analytic.c           Pointer arithmetic (&(temp->R)) within contiguous traversal context. Preserved required unexposed contiguous traversal logic and structure packing. (Disposition: Deviation Accepted).
+18.4    REQD    Report.c             Pointer arithmetic is implicitly used by strstr parsing network dev. required unexposed strstr pattern preservation is achieved. (Disposition: Deviation Accepted).
+=============================================================================

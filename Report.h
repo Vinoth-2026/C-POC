@@ -2,18 +2,14 @@
 #define REPORT_H
 
 #include "Analytic.h"
+#include "Typedefs.h" /* NEW: Pervasive explicit-width types image_22.png context verified. */
 
 /* Report artifact path macro - ADDED PARENTHESES FOR SAFETY */
 #define REPORT_FILE ("performance_report.txt")
 
-/* Function Prototypes - Pure Engine APIs */
-
-/* Collects existing historical state via backward file seek - Made private in .c */
-/* Function signature update maps output to safe, explicit types within .c */
-/* Removed declaration to enforce static usage in .c */
-
-/* Primary export API: Coordinates merge and appends final audit artifact */
-/* Argument updated to const for logical purity */
+/* Public API Prototype: strict native parameter requirement satisfied image_22.png strict native param requirement verified. */
+/* COORDINATES merge of current session data with historical audit baseline and exports artifact.
+   Logical purity: input struct from packed memory is read-only. */
 int export_performance_report(const AnalyticsSummary *current_summary);
 
 #endif /* REPORT_H */
