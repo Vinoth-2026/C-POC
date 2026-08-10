@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <pthread.h>
 #include <unistd.h> /* for sleep/usleep */
 #include <CUnit/CUnit.h>
@@ -8,6 +9,14 @@
 #include "DataCollection.h" /* Target module and synchronization primitives */
 #include "Typedefs.h"
 #include "test_suites.h" /* Header declaring this suite's functions */
+
+/* Whitebox test: pull in DataCollection.c directly so this suite can also
+ * exercise its static helper get_time() (Section 14: dependency
+ * injection/test-doubles aren't practical for a single tiny static helper,
+ * so we test it via source inclusion instead, matching the pattern already
+ * used in test_KPI_Collection.c). The Makefile excludes
+ * obj/src/DataCollection.o from the test link to avoid duplicate symbols. */
+#include "../src/DataCollection.c"
 
 /* Define a temp log file for testing file I/O helpers to avoid polluting prod logs */
 #define TEST_LOG_FILE "logs/test_network.log"

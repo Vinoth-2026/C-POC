@@ -1,13 +1,14 @@
 #ifndef DATA_COLLECTION_H
 #define DATA_COLLECTION_H
 
-#include <pthread.h> /* NEW: Required for synchronization types */
-#include "Typedefs.h" /* NEW: Pervasive explicit-width types image_22.png architecture verified. */
+#include <pthread.h>
+#include "Typedefs.h"
 
-/* Log File Macro - Safer Syntax */
+/* Sequential (append-mode) log of every collected KPI record. */
 #define DATA_LOG_FILE ("logs/network_log.txt")
 
-/* Record Structure - Packable data, strictly native types retained image_22.png strict native param requirement verified. */
+/* Single KPI sample. Native types are retained here because this struct is
+ * serialized to/parsed from DATA_LOG_FILE in a fixed text format. */
 typedef struct {
     Record_Native_Int    latency;
     Record_Native_Short  packet_loss;
@@ -16,43 +17,49 @@ typedef struct {
     Record_Native_Double memory_usage;
 } Record;
 
-/* Forward declare the DLL Node structure for external visibility image_22.png. */
 typedef struct DLL DLL;
 
-/* Public Doubly Linked List Node Structure definition - PACKED */
-/* MODIFICATION (CRITICAL INTEGRATION CORE LOGIC PRESERVATION): Unexposed private contiguous traversal logic & packed pattern preservation.
-   Struct is packed, native datatypes are strictly retained in the PUBLIC structure definition image_22.png strict native param requirement verified.
-   Forward declaration prevents packed-scope pointers. */
+/* Doubly linked list node holding one Record. Deliberately NOT packed:
+ * packing this struct provided no functional benefit (it is an in-memory
+ * data structure only, never serialized byte-for-byte) and risks creating
+ * misaligned pointers to its Record_Native_Double members, which is
+ * undefined behavior in C and was flagged by the compiler
+ * (-Waddress-of-packed-member). See docs/MISRA_DEVIATIONS.md. */
 struct DLL {
-    Record R;       /* Contiguously stored data image_22.png pervasive context verified. */
-    DLL *next;      /* Public safe pointer to next node. */
-    DLL *prev;      /* Public safe pointer to previous node. */
-} __attribute__((packed)); /* Forced contiguous memory layout. */
+    Record R;
+    DLL *next;
+    DLL *prev;
+};
 
-/* Public Queue Pointers - extern keyword included. */
+/* Shared queue state. All access must hold queue_mutex. */
 extern DLL *front;
 extern DLL *rear;
 extern Record_Native_Int count;
 
-/* Removed internal declarations (display, get_data) to enforce static usage image_22.png verified context verified. */
+/* Synchronizes access to front/rear/count. queue_cond signals a waiting
+ * consumer (dequeue) that a new record is available. */
+extern pthread_mutex_t queue_mutex;
+extern pthread_cond_t  queue_cond;
 
-/* === NEW: Synchronization Primitives for Shared Queue === */
-/* COORDINATES concurrent flow unexposed static helpers verified concurrent static helpers dequeue verified concurrent high-performance Parallel pipeline context unexposed high-performance Parallel concurrent flow concurrent high-performance concurrent high-performance data high-performance concurrent high-performance verified data concurrent data high-performance verified high-performance high-performance verified high-performance verified flow verified image_22.png Architecture verified data high-performance validated data context Parallel architecture data high-performance parallel flow high-performance data verified high-performance high-performance parallel parallel parallel high-performance. */
-extern pthread_mutex_t queue_mutex; /* Synchronizes access to DLL pointers. */
-extern pthread_cond_t  queue_cond;  /* Signals Consumer when data is available. */
+/* Appends R to DATA_LOG_FILE (independent of the in-memory queue). */
+void store_data(const Record *R);
 
-/* === Public API Prototypes === */
-/* strict native parameter requirement satisfied image_22.png strict native param requirement satisfied. */
-void store_data(Record *R);       /* Sequential logging logic preserved image_22.png pervasive architecture. */
-void enqueue(const Record *R);    /* Pushes data to DLL rear - Thread Safe unexposed wake up signaling context image_22.png architecture verified. */
-void queue_display(void);         /* Traverses DLL from front to rear. */
-void free_queue(void);            /* Frees DLL memory front-to-back. */
-void rebuild_dll(void);           /* Regenerates DLL from the log file (Deviation Rule 17.1 required backward seek). */
+/* Copies *R into a new node and appends it to the shared queue (thread-safe;
+ * signals queue_cond on success). */
+void enqueue(const Record *R);
 
-/* === NEW: Integrated Parallel Logic pervasive pervasive high-performance test harnesses verification context verified image_22.png. === */
-/* Core requirement preservation: Parallel pipeline unexposed static helpers verified context image_22.png concurrent flow verified concurrent flow verified. */
-/* COORDINATES concurrent flow unexposed static helpers dequeue verified concurrent high-performance dequeue verified context verified concurrent high-performance Parallel pipeline context. */
-/* PERVASIVE Unexposed static logic context verified context image_22.png pervasive architectural synchronization context. */
-extern DLL* dequeue(void); /* Safe, locked pop using mutex/cond unexposed signaling unexposed wake up wake up verified image_22.png pervasive context verified context. */
+/* Prints the current queue front-to-rear (thread-safe). */
+void queue_display(void);
+
+/* Frees every node in the shared queue and resets it to empty (thread-safe). */
+void free_queue(void);
+
+/* Clears the in-memory queue and repopulates it by replaying DATA_LOG_FILE. */
+void rebuild_dll(void);
+
+/* Blocks until a record is available, then removes and returns the front
+ * node (thread-safe). Caller owns the returned node and must free() it.
+ * Returns NULL only if internal locking fails. */
+DLL *dequeue(void);
 
 #endif /* DATA_COLLECTION_H */

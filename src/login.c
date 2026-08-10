@@ -5,8 +5,7 @@
 #include "login.h"
 #include "ErrorLog.h" /* NEW: Required for centralized logging */
 
-/* --- MODIFIED: Unexposed Private Helper with Safe I/O --- */
-/* Core Requirement: unexposed private logic verified.
+/* Prompts for and reads a username/password pair from stdin.
    Goal: Resolve Unsafe Standard I/O (Required Violation Rule 17.1).
    Replacing scanf with bounded fgets for basic buffer overflow protection. */
 void get_Credentials(char *username, char *password)
@@ -25,12 +24,23 @@ void get_Credentials(char *username, char *password)
         /* Remove newline character if present */
         username[strcspn(username, "\n")] = '\0';
     }
+    else
+    {
+        /* EOF or read error: caller's buffer may be uninitialized stack
+         * memory. Force it to an empty, safely-terminated string so
+         * validate_Credentials() never reads past an unterminated buffer. */
+        username[0] = '\0';
+    }
 
     printf("Enter Password : ");
     if (fgets(password, MAX, stdin) != NULL)
     {
         /* Remove newline character if present */
         password[strcspn(password, "\n")] = '\0';
+    }
+    else
+    {
+        password[0] = '\0';
     }
 
     return;

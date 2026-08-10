@@ -12,6 +12,8 @@ int main(void)
     CU_pSuite pSuiteAnalytic = NULL;
     CU_pSuite pSuiteData = NULL;
     CU_pSuite pSuiteKPI = NULL;
+    CU_pSuite pSuiteLogin = NULL;
+    CU_pSuite pSuiteReport = NULL;
 
     /* 1. Initialize the CUnit test registry */
     if (CUE_SUCCESS != CU_initialize_registry()) {
@@ -64,6 +66,41 @@ int main(void)
          (NULL == CU_add_test(pSuiteKPI, "test /proc/stat parser with file stubs", test_proc_stat_parser_robustness)) ||
          (NULL == CU_add_test(pSuiteKPI, "test /proc/meminfo parser with file stubs", test_proc_meminfo_parser_robustness)) ||
          (NULL == CU_add_test(pSuiteKPI, "test socket failure graceful handling", test_socket_failure_handling)) )
+    {
+        goto cleanup;
+    }
+
+
+    /* --- Suite 4: login Module --- */
+    pSuiteLogin = CU_add_suite("Login_Module_Suite", init_login_suite, clean_login_suite);
+    if (NULL == pSuiteLogin) {
+        goto cleanup;
+    }
+
+    if ( (NULL == CU_add_test(pSuiteLogin, "test validate_Credentials matches correct pair", test_validate_credentials_match)) ||
+         (NULL == CU_add_test(pSuiteLogin, "test validate_Credentials rejects wrong password", test_validate_credentials_wrong_password)) ||
+         (NULL == CU_add_test(pSuiteLogin, "test validate_Credentials rejects unknown user", test_validate_credentials_unknown_user)) ||
+         (NULL == CU_add_test(pSuiteLogin, "test validate_Credentials with multiple lines", test_validate_credentials_multi_line)) ||
+         (NULL == CU_add_test(pSuiteLogin, "test validate_Credentials skips malformed line", test_validate_credentials_malformed_line)) ||
+         (NULL == CU_add_test(pSuiteLogin, "test validate_Credentials with missing file", test_validate_credentials_missing_file)) ||
+         (NULL == CU_add_test(pSuiteLogin, "test validate_Credentials with NULL args", test_validate_credentials_null_args)) ||
+         (NULL == CU_add_test(pSuiteLogin, "test validate_Credentials prefix-username no match", test_validate_credentials_prefix_username_no_match)) )
+    {
+        goto cleanup;
+    }
+
+
+    /* --- Suite 5: Report Module --- */
+    pSuiteReport = CU_add_suite("Report_Module_Suite", init_report_suite, clean_report_suite);
+    if (NULL == pSuiteReport) {
+        goto cleanup;
+    }
+
+    if ( (NULL == CU_add_test(pSuiteReport, "test export_performance_report rejects NULL", test_export_report_null_input)) ||
+         (NULL == CU_add_test(pSuiteReport, "test export_performance_report rejects empty summary", test_export_report_empty_summary)) ||
+         (NULL == CU_add_test(pSuiteReport, "test export_performance_report first write", test_export_report_first_write)) ||
+         (NULL == CU_add_test(pSuiteReport, "test export_performance_report merges with history", test_export_report_merges_with_history)) ||
+         (NULL == CU_add_test(pSuiteReport, "test export_performance_report handles unwritable path", test_export_report_unwritable_path)) )
     {
         goto cleanup;
     }

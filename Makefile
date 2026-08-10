@@ -3,92 +3,154 @@
 # =========================================================================
 
 # --- Directories ---
-SRC_DIR = src
-INC_DIR = include
-OBJ_DIR = obj
-BIN_DIR = bin
-LOG_DIR = logs
+SRC_DIR  = src
+INC_DIR  = include
+OBJ_DIR  = obj
+BIN_DIR  = bin
+LOG_DIR  = logs
 TEST_DIR = test
 
 # --- Executables ---
 TARGET_APP  = $(BIN_DIR)/performance_engine
 TARGET_TEST = $(BIN_DIR)/test_engine
 
-# --- Compiler & Flags ---
+# --- Compiler & strict warning flags ---
 CC = gcc
-# Enforce MISRA-C level (C99 is often used) and enable warnings
-# Adding -g for debug symbols is essential for Valgrind/Helgrind analysis.
-CFLAGS = -Wall -Wextra -Wpedantic -std=c99 -g
-# Include path for application headers
-CFLAGS += -I$(INC_DIR)
 
-# Linker flags for app (requires pthreads)
+# _POSIX_C_SOURCE/_DEFAULT_SOURCE are required for localtime_r(), usleep(),
+# and friends under -std=c11 (which alone hides them behind feature-test
+# macros on glibc).
+FEATURE_FLAGS = -D_POSIX_C_SOURCE=200809L -D_DEFAULT_SOURCE
+
+WARN_FLAGS = -Wall -Wextra -Wpedantic -Wconversion -Wsign-conversion \
+             -Wshadow -Wformat=2 -Wundef -Wstrict-prototypes \
+             -Wmissing-prototypes -Wold-style-definition -Wwrite-strings \
+             -Wcast-qual -Wpointer-arith -Werror
+
+CFLAGS  = -std=c11 $(WARN_FLAGS) $(FEATURE_FLAGS) -I$(INC_DIR) -g
 LDFLAGS = -lpthread
 
-# Linker flags for tests (requires CUnit and pthreads)
-TEST_LDFLAGS = -lcunit -lpthread
+# --- CUnit auto-detection --------------------------------------------------
+# Prefer a real, system-installed CUnit. Fall back to the bundled
+# test/mocks/mini_cunit shim (see test/mocks/CUnit/CUnit.h) only if
+# libcunit1-dev is not available -- e.g. in network-restricted sandboxes.
+HAVE_CUNIT := $(shell echo 'int main(void){return 0;}' | \
+              $(CC) -x c - -o /tmp/.cunit_probe -lcunit >/dev/null 2>&1 && \
+              echo yes)
 
-# --- Files ---
+ifeq ($(HAVE_CUNIT),yes)
+    TEST_CFLAGS   = $(CFLAGS)
+    TEST_LDFLAGS  = -lcunit -lpthread
+    MOCK_OBJS     =
+    CUNIT_STATUS  = "Using system CUnit (libcunit1-dev)"
+else
+    TEST_CFLAGS   = $(CFLAGS) -I$(TEST_DIR)/mocks
+    TEST_LDFLAGS  = -lpthread
+    MOCK_OBJS     = $(OBJ_DIR)/test/mini_cunit.o
+    CUNIT_STATUS  = "libcunit1-dev NOT AVAILABLE - using bundled test/mocks/mini_cunit shim"
+endif
 
-# Production Files
-# We find all .c files in src/ and create parallel .o file lists in obj/src/
-SRCS      = $(wildcard $(SRC_DIR)/*.c)
-OBJS      = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/src/%.o, $(SRCS))
+# --- Files ------------------------------------------------------------------
+SRCS = $(wildcard $(SRC_DIR)/*.c)
+OBJS = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/src/%.o, $(SRCS))
 
-# To link the test executable, we need all production objects *except* main.o
-MAIN_OBJ  = $(OBJ_DIR)/src/main.o
-PROD_OBJS = $(filter-out $(MAIN_OBJ), $(OBJS))
+MAIN_OBJ = $(OBJ_DIR)/src/main.o
 
-# Test Files
-# We find all .c files in test/ and create parallel .o file lists in obj/test/
+# test_DataCollection.c and test_KPI_Collection.c are WHITEBOX tests: they
+# #include the corresponding .c file directly to reach static helper
+# functions. Their production .o files must therefore be excluded from the
+# test link, or the two definitions collide at link time.
+WHITEBOX_SRCS  = DataCollection.c KPI_Collection.c login.c Report.c
+WHITEBOX_OBJS  = $(patsubst %.c, $(OBJ_DIR)/src/%.o, $(WHITEBOX_SRCS))
+
+PROD_OBJS = $(filter-out $(MAIN_OBJ) $(WHITEBOX_OBJS), $(OBJS))
+
 TEST_SRCS = $(wildcard $(TEST_DIR)/*.c)
 TEST_OBJS = $(patsubst $(TEST_DIR)/%.c, $(OBJ_DIR)/test/%.o, $(TEST_SRCS))
 
+# --- Rules -------------------------------------------------------------------
 
-# --- Rules ---
+.PHONY: all clean run_tests directories test debug valgrind helgrind cppcheck coverage
 
-# Special targets that aren't file names
-.PHONY: all clean run_tests directories test
-
-# Default target: build the main application
 all: directories $(TARGET_APP)
 
-# Link Application
-# The output goes to bin/
 $(TARGET_APP): $(OBJS)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
-# Compile Production Source
-# We create a specific rule for src/ files to output to obj/src/
 $(OBJ_DIR)/src/%.o: $(SRC_DIR)/%.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-# Build Test Executable
+# --- Test build ---------------------------------------------------------------
 test: directories $(TARGET_TEST)
+	@echo $(CUNIT_STATUS)
 
-# Link Test Executable
-# Links in production objects (sans main.o) and the test objects with CUnit flags
-$(TARGET_TEST): $(PROD_OBJS) $(TEST_OBJS)
-	$(CC) $(CFLAGS) -o $@ $^ $(TEST_LDFLAGS)
+$(TARGET_TEST): $(PROD_OBJS) $(TEST_OBJS) $(MOCK_OBJS)
+	$(CC) $(TEST_CFLAGS) -o $@ $^ $(TEST_LDFLAGS)
 
-# Compile Test Source
-# We create a specific rule for test/ files to output to obj/test/
 $(OBJ_DIR)/test/%.o: $(TEST_DIR)/%.c
-	$(CC) $(CFLAGS) -c $< -o $@
+	$(CC) $(TEST_CFLAGS) -c $< -o $@
 
-# Convenient target to build and then execute tests
+$(OBJ_DIR)/test/mini_cunit.o: $(TEST_DIR)/mocks/mini_cunit.c
+	$(CC) $(TEST_CFLAGS) -c $< -o $@
+
 run_tests: test
 	@mkdir -p $(LOG_DIR)
-	@echo "\n--- Running CUnit Tests ---"
+	@echo "--- Running Test Suite ---"
+	@echo $(CUNIT_STATUS)
 	./$(TARGET_TEST)
 
-# Target to ensure build directories exist
+# --- Debug build (no optimization, symbols, for gdb) --------------------------
+debug: CFLAGS += -O0 -DDEBUG
+debug: clean all
+
 directories:
 	@mkdir -p $(OBJ_DIR)/src
 	@mkdir -p $(OBJ_DIR)/test
 	@mkdir -p $(BIN_DIR)
 	@mkdir -p $(LOG_DIR)
 
-# Target to remove all build artifacts and logs
+# --- Dynamic analysis targets ---------------------------------------------
+# Each target checks for its tool and prints the required, honest
+# "NOT EXECUTED - TOOL UNAVAILABLE" message instead of silently skipping or
+# fabricating a result, per project verification policy.
+
+valgrind: all
+	@if command -v valgrind >/dev/null 2>&1; then \
+		echo "--- Valgrind Memcheck: $(TARGET_APP) ---"; \
+		printf 'vinoth\n12345\n4\n' | valgrind --leak-check=full --show-leak-kinds=all \
+			--track-origins=yes --error-exitcode=1 ./$(TARGET_APP); \
+	else \
+		echo "NOT EXECUTED - TOOL UNAVAILABLE (valgrind)"; \
+	fi
+
+helgrind: all
+	@if command -v valgrind >/dev/null 2>&1; then \
+		echo "--- Helgrind: $(TARGET_APP) ---"; \
+		printf 'vinoth\n12345\n4\n' | valgrind --tool=helgrind ./$(TARGET_APP); \
+	else \
+		echo "NOT EXECUTED - TOOL UNAVAILABLE (valgrind/helgrind)"; \
+	fi
+
+cppcheck:
+	@if command -v cppcheck >/dev/null 2>&1; then \
+		cppcheck --enable=all --std=c11 --inconclusive --force -I$(INC_DIR) $(SRC_DIR); \
+	else \
+		echo "NOT EXECUTED - TOOL UNAVAILABLE (cppcheck)"; \
+	fi
+
+coverage:
+	@if command -v gcov >/dev/null 2>&1; then \
+		$(MAKE) clean >/dev/null; \
+		$(MAKE) test CFLAGS="$(CFLAGS) --coverage" TEST_LDFLAGS="$(TEST_LDFLAGS) --coverage"; \
+		./$(TARGET_TEST); \
+		echo "--- gcov (note: DataCollection.c/KPI_Collection.c are exercised via"; \
+		echo "    whitebox #include in their tests, not as separate test objects,"; \
+		echo "    so gcov cannot attribute coverage to them here) ---"; \
+		gcov -o $(OBJ_DIR)/src src/Analytic.c src/ErrorLog.c src/Report.c src/login.c || true; \
+	else \
+		echo "NOT EXECUTED - TOOL UNAVAILABLE (gcov)"; \
+	fi
+
 clean:
 	rm -rf $(OBJ_DIR) $(BIN_DIR) $(LOG_DIR)
+	rm -f *.gcov $(SRC_DIR)/*.gcda $(SRC_DIR)/*.gcno

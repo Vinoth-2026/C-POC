@@ -6,7 +6,6 @@
 
 /* The name of the dedicated error log file */
 
-
 /* --- Private (static) Internal State --- */
 /* Mutex to protect access to the log file, initialized statically */
 static pthread_mutex_t log_mutex = PTHREAD_MUTEX_INITIALIZER;

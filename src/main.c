@@ -15,7 +15,16 @@
 static void print_menu(void);
 
 /* Static helper for MISRA-compliant, safe integer input from stdin */
-static S32 get_menu_choice(int *choice);
+typedef enum {
+    MENU_INPUT_OK = 0,
+    MENU_INPUT_INVALID,
+    MENU_INPUT_EOF
+} MenuInputResult;
+static MenuInputResult get_menu_choice(int *choice);
+
+/* Producer thread entry point; must have external linkage (passed to
+ * pthread_create) so it needs a prototype visible at its definition. */
+void *producer_thread_function(void *arg);
 
 /* Global control flag for the producer thread */
 volatile Record_Native_Int processing_active = 0;
@@ -63,8 +72,8 @@ int main(void) {
 
     ErrorLog_Write(LOG_LEVEL_INFO, "MAIN_COORDINATOR", "5G Engine starting up.");
 
-    char username[MAX];
-    char password[MAX];
+    char username[MAX] = {0};
+    char password[MAX] = {0};
     int choice = 0;
     AnalyticsSummary summary_report;
     pthread_t producer_tid;
@@ -98,9 +107,21 @@ int main(void) {
         print_menu();
 
         /* MISRA Compliance: Replaced scanf with safe input helper */
-        if (!get_menu_choice(&choice)) {
-            printf("Invalid input. Please enter a number.\n");
-            continue;
+        {
+            MenuInputResult input_result = get_menu_choice(&choice);
+            if (input_result == MENU_INPUT_EOF) {
+                /* stdin closed or unreadable: looping forever here would be
+                 * a busy-loop (fgets() returns NULL again immediately every
+                 * time once EOF is reached), so treat this the same as
+                 * choosing "Exit". */
+                printf("\nEnd of input detected. Exiting...\n");
+                ErrorLog_Write(LOG_LEVEL_WARNING, "MAIN_COORDINATOR", "EOF/read error on stdin; exiting menu loop.");
+                goto cleanup;
+            }
+            if (input_result == MENU_INPUT_INVALID) {
+                printf("Invalid input. Please enter a number.\n");
+                continue;
+            }
         }
 
         switch (choice) {
@@ -182,10 +203,10 @@ static void print_menu(void) {
 }
 
 /* MISRA-compliant helper for safe integer input */
-static S32 get_menu_choice(int *choice) {
+static MenuInputResult get_menu_choice(int *choice) {
     char buffer[16];
     if (fgets(buffer, sizeof(buffer), stdin) == NULL) {
-        return 0; // EOF or error
+        return MENU_INPUT_EOF; /* EOF or unrecoverable stream error */
     }
     
     // Remove newline character if present
@@ -193,7 +214,7 @@ static S32 get_menu_choice(int *choice) {
     
     // Check if input is empty
     if (strlen(buffer) == 0U) {
-        return 0; 
+        return MENU_INPUT_INVALID; 
     }
 
     char *endptr;
@@ -202,9 +223,9 @@ static S32 get_menu_choice(int *choice) {
 
     // Check if conversion succeeded (endptr should point to null terminator)
     if (*endptr != '\0') {
-        return 0; 
+        return MENU_INPUT_INVALID; 
     }
 
     *choice = (int)val;
-    return 1; // Success
+    return MENU_INPUT_OK;
 }

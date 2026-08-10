@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <pthread.h>
 #include <CUnit/CUnit.h>
 
@@ -29,11 +30,11 @@ static void populate_mock_queue(U64 latency_vals[], U64 tp_vals[], F32 pl_vals[]
 
     for (int i = 0; i < num_records; ++i) {
         Record rec;
-        rec->latency = (Record_Native_Int)latency_vals[i];
-        rec->packet_loss = (Record_Native_Short)pl_vals[i];
-        rec->through_put = (Record_Native_Long)tp_vals[i];
-        rec->cpu_usage = 50.0; // Fixed dummy values
-        rec->memory_usage = 60.0;
+        rec.latency = (Record_Native_Int)latency_vals[i];
+        rec.packet_loss = (Record_Native_Short)pl_vals[i];
+        rec.through_put = (Record_Native_Long)tp_vals[i];
+        rec.cpu_usage = 50.0; // Fixed dummy values
+        rec.memory_usage = 60.0;
 
         /* Standard Enqueue Logic (internal to DataCollection.c, reproduced here for setup isolation) */
         DLL *newnode = (DLL *)malloc(sizeof(DLL));
@@ -42,7 +43,7 @@ static void populate_mock_queue(U64 latency_vals[], U64 tp_vals[], F32 pl_vals[]
             pthread_mutex_unlock(&queue_mutex);
             return;
         }
-        memcpy(&newnode->R, rec, sizeof(Record));
+        memcpy(&newnode->R, &rec, sizeof(Record));
         newnode->next = NULL;
         newnode->prev = NULL;
 
@@ -87,8 +88,8 @@ int clean_analytic_suite(void) {
 
 /* Test 1: Validate SLA Alerts (Pure math logic validation) */
 void test_analyze_latency_alerts(void) {
-    Record rec;
-    
+    Record rec = {0};
+
     /* Case A: Under threshold (Normal) */
     rec.latency = (Record_Native_Int)(LATENCY_SLA_THRESHOLD - 10U);
     /* Cannot easily verify stdout output from CUnit without redirection, 
@@ -102,7 +103,7 @@ void test_analyze_latency_alerts(void) {
 
 /* Test 2: Validate SLA Alerts (Pure math logic validation) */
 void test_analyze_packet_loss_alerts(void) {
-    Record rec;
+    Record rec = {0};
 
     /* Case A: Under threshold (Normal) */
     rec.packet_loss = (Record_Native_Short)(PACKET_LOSS_SLA_THRESHOLD - 1.0F);

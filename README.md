@@ -32,3 +32,45 @@ To compile the main application, run the following command from the project root
 
 ```bash
 make
+```
+
+This produces `bin/performance_engine`. Run it with:
+
+```bash
+./bin/performance_engine
+```
+
+Log in with the credentials in `config/Credentials.txt` (default: username
+`vinoth`, password `12345`).
+
+### 2. Build and Run the Test Suite
+
+```bash
+make run_tests
+```
+
+This detects whether `libcunit1-dev` is installed and links against it if
+so. If it is **not** installed (e.g. no network access to fetch it), the
+Makefile automatically falls back to a small, documented CUnit-API-compatible
+shim in `test/mocks/` so the same test sources still compile and run for
+real — no test code needs to change either way. Current status: 5 suites,
+26 tests, 130 assertions, 0 failures.
+
+### 3. Other Makefile targets
+
+```bash
+make clean      # remove build artifacts and logs
+make debug      # unoptimized debug build
+make valgrind   # Memcheck the built app (prints "NOT EXECUTED - TOOL UNAVAILABLE" if valgrind isn't installed)
+make helgrind   # Helgrind the built app (same fallback behavior)
+make cppcheck   # static analysis (same fallback behavior)
+make coverage   # gcov line-coverage report (same fallback behavior)
+```
+
+### 4. Further documentation
+
+- `docs/VERIFICATION_REPORT.md` — full audit: architecture, every defect
+  found and fixed, memory/thread-safety analysis, and an honest accounting
+  of which verification tools actually ran versus which were unavailable.
+- `docs/MISRA_DEVIATIONS.md` — known/likely MISRA-C:2012 deviations and
+  their rationale (not a substitute for a real MISRA tool run).

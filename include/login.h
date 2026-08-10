@@ -1,16 +1,22 @@
-#ifndef login_h
-#define login_h
+#ifndef LOGIN_H
+#define LOGIN_H
 
-#include "Typedefs.h" /* NEW: Foundational MISRA C types (e.g., U32, F32) per pervasive architecture discussed in image_22.png context. */
+#include "Typedefs.h"
 
-/* === Refined Constants === */
-/* MODIFICATION (CRITICAL): Parentheses added for precedence safety in synchronized contexts. */
+/* Credential store path (space-separated "username password" lines). */
 #define CREDENTIAL_PATH ("config/Credentials.txt")
-#define MAX             (100)
 
-/* Internal function prototypes remain unchanged, strict native parameter requirement satisfied image_22.png strict native param requirement verified. */
+/* Maximum length (including NUL) for username/password buffers. */
+#define MAX (100)
+
+/* Reads a username/password pair from stdin into caller-owned buffers of
+ * at least MAX bytes each. Does nothing if either pointer is NULL. */
 void get_Credentials(char *username, char *password);
-int validate_Credentials(char *username, char *password);
-int login_attempt(char* username, char* password);
 
-#endif /* login_h */
+/* Returns 1 if username/password match a line in CREDENTIAL_PATH, else 0. */
+int validate_Credentials(char *username, char *password);
+
+/* Prompts up to 3 times for credentials. Returns 1 on success, 0 on failure. */
+int login_attempt(char *username, char *password);
+
+#endif /* LOGIN_H */
