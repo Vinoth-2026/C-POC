@@ -101,7 +101,7 @@ void test_validate_credentials_null_args(void) {
 }
 
 /* Test 8: username that is a prefix of another username must not match
- * (guards against the space-delimiter scan being off-by-one). */
+ * (guards against the space-delimiter scan being off-by-one).   */
 void test_validate_credentials_prefix_username_no_match(void) {
     char user[MAX] = "vin";
     char pass[MAX] = "12345";
