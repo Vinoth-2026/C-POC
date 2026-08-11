@@ -5,10 +5,16 @@
 #include "login.h"
 #include "ErrorLog.h" /* NEW: Required for centralized logging */
 
+/* get_Credentials()/validate_Credentials() are internal helpers used only
+ * by login_attempt() (the module's sole external entry point) -- see
+ * cppcheck's staticFunction finding. Kept out of login.h accordingly;
+ * test/test_login.c still reaches validate_Credentials() via its whitebox
+ * #include of this file, so internal linkage doesn't reduce testability. */
+
 /* Prompts for and reads a username/password pair from stdin.
    Goal: Resolve Unsafe Standard I/O (Required Violation Rule 17.1).
    Replacing scanf with bounded fgets for basic buffer overflow protection. */
-void get_Credentials(char *username, char *password)
+static void get_Credentials(char *username, char *password)
 {
     /* Parameter validation for MISRA compliance */
     if (username == NULL || password == NULL) {
@@ -46,7 +52,7 @@ void get_Credentials(char *username, char *password)
     return;
 }
 
-int validate_Credentials(char *username, char *password)
+static int validate_Credentials(const char *username, const char *password)
 {
     /* Parameter validation */
     if (username == NULL || password == NULL) {
@@ -80,7 +86,7 @@ int validate_Credentials(char *username, char *password)
         line[strcspn(line, "\n")] = '\0';
 
         /* Finding space delimiter */
-        char *space_ptr = strstr(line, " ");
+        const char *space_ptr = strstr(line, " ");
         if (space_ptr == NULL) {
             continue; // Skip malformed lines
         }

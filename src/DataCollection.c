@@ -104,6 +104,10 @@ void enqueue(const Record *R)
     }
 }
 
+/* cppcheck-suppress unusedFunction
+ * Public API (declared in DataCollection.h). Not called from within src/,
+ * but genuinely used by test/test_DataCollection.c and is exposed for
+ * future external consumers of this module's queue. */
 DLL* dequeue(void)
 {
     DLL *node = NULL;
@@ -217,7 +221,7 @@ void rebuild_dll(void)
 static void display(const DLL *temp) {
     /* Called while queue_mutex is held by queue_display. Thread safety guaranteed. */
     while (temp != NULL) {
-        printf("Lat: %d ms, PL: %u %%, TP: %ld B/s, CPU: %.2f %%, Mem: %.2f %%\n",
+        printf("Lat: %d us, PL: %u %%, TP: %ld B/s, CPU: %.2f %%, Mem: %.2f %%\n",
                temp->R.latency, (unsigned int)temp->R.packet_loss, temp->R.through_put,
                temp->R.cpu_usage, temp->R.memory_usage);
         temp = temp->next;

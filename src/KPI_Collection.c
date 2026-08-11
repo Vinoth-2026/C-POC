@@ -415,10 +415,19 @@ static void *latency_server(void *arg)
     }
 
     {
-        const double elapsed_ms =
-            ((double)(t_end.tv_sec - t_start.tv_sec) * 1000.0) +
-            ((double)(t_end.tv_nsec - t_start.tv_nsec) / 1000000.0);
-        *latency_out = (elapsed_ms > 0.0) ? (F32)elapsed_ms : 0.0F;
+        /* Round-trip time in MICROSECONDS (not milliseconds). A loopback
+         * (127.0.0.1) TCP round trip is typically well under 1ms on modern
+         * hardware, so measuring/storing in whole milliseconds would floor
+         * to 0 on nearly every sample -- that looked like "latency is
+         * always 0", but the probe itself was measuring correctly; the unit
+         * just didn't have enough resolution to represent the result.
+         * Microseconds give 1000x the resolution while still fitting
+         * comfortably in Record_Native_Int (see LATENCY_SLA_THRESHOLD in
+         * Analytic.h, which is expressed in the same unit). */
+        const double elapsed_us =
+            ((double)(t_end.tv_sec - t_start.tv_sec) * 1000000.0) +
+            ((double)(t_end.tv_nsec - t_start.tv_nsec) / 1000.0);
+        *latency_out = (elapsed_us > 0.0) ? (F32)elapsed_us : 0.0F;
     }
 
     return NULL;
@@ -526,7 +535,11 @@ int get_KPI(Record *rec)
     }
 
     /* === INTEGRATION CORE LOGIC PRESERVATION === */
-        rec->latency = (Record_Native_Int)latency;
+        /* rec->latency is in MICROSECONDS -- see the comment in latency_server()
+     * for why (a loopback round trip is sub-millisecond, so whole
+     * milliseconds had no usable resolution). Rounded rather than truncated
+     * so the conversion doesn't systematically bias every reading downward. */
+    rec->latency = (Record_Native_Int)(latency + 0.5F);
     
         rec->packet_loss = (Record_Native_Short)((r_packetloss + t_packetloss) / 2.0F);
     

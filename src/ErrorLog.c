@@ -77,9 +77,9 @@ void ErrorLog_Cleanup(void) {
        that exist for the life of the program, but good practice. */
 }
 
-void ErrorLog_Write(LogLevel level, const char *module, const char *message) {
+void ErrorLog_Write(LogLevel level, const char *module_name, const char *message) {
     /* Basic pointer validation */
-    if (log_file == NULL || module == NULL || message == NULL) {
+    if (log_file == NULL || module_name == NULL || message == NULL) {
         return;
     }
 
@@ -91,7 +91,7 @@ void ErrorLog_Write(LogLevel level, const char *module, const char *message) {
     
     /* Format: [TIMESTAMP] [LEVEL] [MODULE] - MESSAGE */
     fprintf(log_file, "[%s] [%s] [%s] - %s\n", 
-            timestamp, level_to_string(level), module, message);
+            timestamp, level_to_string(level), module_name, message);
     
     /* Flush immediately to ensure the log is written in case of a crash. */
     fflush(log_file);

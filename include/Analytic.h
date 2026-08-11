@@ -5,7 +5,7 @@
 #include "Typedefs.h"
 
 /* SLA/warning thresholds. */
-#define LATENCY_SLA_THRESHOLD     (20U)   /* ms */
+#define LATENCY_SLA_THRESHOLD     (20000U) /* microseconds (== 20 ms SLA) */
 #define PACKET_LOSS_SLA_THRESHOLD (1.0F)  /* % */
 #define CPU_WARN_THRESHOLD        (80.0F) /* % */
 #define MEMORY_WARN_THRESHOLD     (80.0F) /* % */

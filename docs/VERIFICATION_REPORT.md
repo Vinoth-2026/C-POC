@@ -201,6 +201,56 @@ Dependency order (lowest-level first): `Typedefs.h` → `ErrorLog.c` →
 None of the above were "silenced" — every one is an actual behavioral or
 build fix, verified by rebuilding and re-running.
 
+### 4.1 Follow-up fixes (second review pass)
+
+15. **Latency always displayed as 0 (reported by user after live testing).**
+    Root cause: a loopback (`127.0.0.1`) TCP round trip is genuinely
+    sub-millisecond on modern hardware, but `Record.latency` stored the
+    result as whole integer **milliseconds** — so a real, correctly-measured
+    round trip like `0.045 ms` truncated to `0` on almost every sample. This
+    was a units/resolution bug, not a broken measurement. **Fixed:**
+    switched the internal unit to **microseconds** (`latency_server()` now
+    computes `elapsed_us` directly from the `timespec` delta instead of
+    routing through milliseconds first), changed the final narrowing cast
+    in `get_KPI()` from truncation to rounding, and updated
+    `LATENCY_SLA_THRESHOLD` (20ms → `20000` us, same SLA) and every printed
+    unit label (`Analytic.c`, `DataCollection.c`, `Report.c`) accordingly.
+    **Verified live:** repeated runs now show `Lat: 18 us` … `Lat: 45 us`
+    instead of a perpetual `Lat: 0 ms`.
+16. **`make valgrind`/`make helgrind` failed to link** with undefined
+    references to `__gcov_init`/`__gcov_exit`/`__gcov_merge_add` (reported
+    by user). Root cause: `make coverage` compiles `Analytic.o`/`ErrorLog.o`
+    with `--coverage` embedded and never cleaned up afterward; a later
+    `make valgrind`/`make helgrind` (which only depended on `all`, not a
+    forced clean rebuild) reused those stale gcov-instrumented `.o` files
+    via Make's normal up-to-date check, then linked without `-lgcov`.
+    **Fixed:** `valgrind`/`helgrind` now force `make clean && make all`
+    every time, and `coverage` rebuilds a clean, non-instrumented tree
+    after collecting its report. **Reproduced the exact failing sequence
+    and verified the fix**: `make coverage` followed immediately by
+    `make valgrind`/`make helgrind` now links `performance_engine`
+    successfully both times.
+17. **Cppcheck findings addressed** (reported by user from a run on their
+    own machine, since cppcheck isn't installable in this sandbox):
+    `funcArgNamesDifferent` (renamed `ErrorLog_Write`'s `module`→
+    `module_name` and `export_performance_report`'s `current`→
+    `current_summary` to match their headers), `constVariablePointer`
+    (`last_tag`/`search_from` in `Report.c`, `space_ptr` in `login.c` are
+    now `const char *`), `constParameterPointer` (`validate_Credentials`
+    now takes `const char *username, const char *password`),
+    `staticFunction` (`get_Credentials`, `validate_Credentials`, and
+    `producer_thread_function` are now `static`; the first two were also
+    removed from `login.h`'s public API since nothing outside `login.c`
+    calls them — `test_login.c` still reaches them via its existing
+    whitebox `#include`), and `unusedFunction` on `dequeue()` (documented
+    with a `cppcheck-suppress` comment rather than removed, since it is
+    genuine public API exercised by `test_DataCollection.c` — cppcheck's
+    `src/`-only scan can't see that). Also tuned the Makefile's cppcheck
+    invocation itself: added `--check-level=exhaustive` (addresses
+    `normalCheckLevelMaxBranches`) and `--suppress=missingIncludeSystem`
+    (cppcheck's own message states this doesn't affect analysis quality
+    when standard headers can't be located in a sandboxed environment).
+
 ---
 
 ## 5. Memory-management analysis (static, since Valgrind is unavailable)

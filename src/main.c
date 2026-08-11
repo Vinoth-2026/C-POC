@@ -22,9 +22,10 @@ typedef enum {
 } MenuInputResult;
 static MenuInputResult get_menu_choice(int *choice);
 
-/* Producer thread entry point; must have external linkage (passed to
- * pthread_create) so it needs a prototype visible at its definition. */
-void *producer_thread_function(void *arg);
+/* Producer thread entry point. Only ever referenced within this file (as a
+ * function pointer passed to pthread_create), so it does not need external
+ * linkage -- see cppcheck's staticFunction finding. */
+static void *producer_thread_function(void *arg);
 
 /* Global control flag for the producer thread */
 volatile Record_Native_Int processing_active = 0;
@@ -33,7 +34,7 @@ volatile Record_Native_Int processing_active = 0;
    PRODUCER Thread Function
    Goal: Gathers KPIs, logs them to file, checks alerts, and enqueues data.
    ========================================================================= */
-void *producer_thread_function(void *arg) {
+static void *producer_thread_function(void *arg) {
     (void)arg; // Unused parameter
     Record rec;
     ErrorLog_Write(LOG_LEVEL_INFO, "PRODUCER_THREAD", "Data Acquisition Active.");

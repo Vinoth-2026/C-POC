@@ -72,10 +72,10 @@ static int read_previous_report(AnalyticsSummary *prev_summary)
     /* Multiple entries can fall inside the read window; the most recent one
      * (what we want to merge against) is always the LAST match, not the
      * first. */
-    char *last_tag = NULL;
+    const char *last_tag = NULL;
     {
-        char *search_from = buffer;
-        char *found;
+        const char *search_from = buffer;
+        const char *found;
         while ((found = strstr(search_from, "HISTORICAL_DATA|")) != NULL) {
             last_tag = found;
             search_from = found + 1;
@@ -105,16 +105,16 @@ static int read_previous_report(AnalyticsSummary *prev_summary)
 /* --- Public API Implementation --- */
 
 /* coordinates merge of current session data with historical audit baseline and exports artifact */
-int export_performance_report(const AnalyticsSummary *current)
+int export_performance_report(const AnalyticsSummary *current_summary)
 {
-        if (current == NULL || current->total_records == 0)
+        if (current_summary == NULL || current_summary->total_records == 0)
     {
         ErrorLog_Write(LOG_LEVEL_WARNING, "REPORT_ENGINE", "No active analytics session data available for export.");
         printf("[Report] No active analytics session data available for export.\n");
         return 0;
     }
 
-        AnalyticsSummary final_report = *current;
+        AnalyticsSummary final_report = *current_summary;
     AnalyticsSummary prev_report;
 
         if (read_previous_report(&prev_report))
@@ -122,7 +122,7 @@ int export_performance_report(const AnalyticsSummary *current)
         printf("[Report] Previous audit baseline found at file tail. Merging statistics...\n");
         ErrorLog_Write(LOG_LEVEL_INFO, "REPORT_ENGINE", "Historical audit baseline found. Merging statistics.");
 
-        Record_Native_Int combined_records = prev_report.total_records + current->total_records;
+        Record_Native_Int combined_records = prev_report.total_records + current_summary->total_records;
 
         /* === MODIFICATION: Core Logic Preservation (Avg Calculation Math Verified) === */
         /* Implicit Conversions threatening mathematical precision (Rule 10.3 required).
@@ -131,31 +131,31 @@ int export_performance_report(const AnalyticsSummary *current)
            Core Logic Preservation: The required averaging formulas remain unchanged. */
         final_report.avg_latency = (Record_Native_Double)(
             (((Record_Native_Double)prev_report.avg_latency * (Record_Native_Double)prev_report.total_records) + 
-             ((Record_Native_Double)current->avg_latency * (Record_Native_Double)current->total_records)) / (Record_Native_Double)combined_records);
+             ((Record_Native_Double)current_summary->avg_latency * (Record_Native_Double)current_summary->total_records)) / (Record_Native_Double)combined_records);
 
         final_report.avg_packet_loss = (Record_Native_Double)(
             (((Record_Native_Double)prev_report.avg_packet_loss * (Record_Native_Double)prev_report.total_records) + 
-             ((Record_Native_Double)current->avg_packet_loss * (Record_Native_Double)current->total_records)) / (Record_Native_Double)combined_records);
+             ((Record_Native_Double)current_summary->avg_packet_loss * (Record_Native_Double)current_summary->total_records)) / (Record_Native_Double)combined_records);
 
         final_report.avg_throughput = (Record_Native_Double)(
             (((Record_Native_Double)prev_report.avg_throughput * (Record_Native_Double)prev_report.total_records) + 
-             ((Record_Native_Double)current->avg_throughput * (Record_Native_Double)current->total_records)) / (Record_Native_Double)combined_records);
+             ((Record_Native_Double)current_summary->avg_throughput * (Record_Native_Double)current_summary->total_records)) / (Record_Native_Double)combined_records);
 
         final_report.avg_cpu_usage = (Record_Native_Double)(
             (((Record_Native_Double)prev_report.avg_cpu_usage * (Record_Native_Double)prev_report.total_records) + 
-             ((Record_Native_Double)current->avg_cpu_usage * (Record_Native_Double)current->total_records)) / (Record_Native_Double)combined_records);
+             ((Record_Native_Double)current_summary->avg_cpu_usage * (Record_Native_Double)current_summary->total_records)) / (Record_Native_Double)combined_records);
 
         final_report.avg_memory_usage = (Record_Native_Double)(
             (((Record_Native_Double)prev_report.avg_memory_usage * (Record_Native_Double)prev_report.total_records) + 
-             ((Record_Native_Double)current->avg_memory_usage * (Record_Native_Double)current->total_records)) / (Record_Native_Double)combined_records);
+             ((Record_Native_Double)current_summary->avg_memory_usage * (Record_Native_Double)current_summary->total_records)) / (Record_Native_Double)combined_records);
 
-                if (prev_report.max_latency > current->max_latency)
+                if (prev_report.max_latency > current_summary->max_latency)
             final_report.max_latency = prev_report.max_latency;
 
-        if (prev_report.min_latency < current->min_latency)
+        if (prev_report.min_latency < current_summary->min_latency)
             final_report.min_latency = prev_report.min_latency;
 
-                if ((U64)prev_report.max_throughput > (U64)current->max_throughput)
+                if ((U64)prev_report.max_throughput > (U64)current_summary->max_throughput)
             final_report.max_throughput = prev_report.max_throughput;
 
         final_report.total_records = combined_records;
@@ -201,15 +201,15 @@ int export_performance_report(const AnalyticsSummary *current)
     fprintf(fp, "-------------------------------------------------------\n");
     fprintf(fp, " COMBINED METRIC AVERAGES:\n");
     
-        fprintf(fp, "  - Average Latency        : %.2f ms\n", final_report.avg_latency);
+        fprintf(fp, "  - Average Latency        : %.2f us\n", final_report.avg_latency);
     fprintf(fp, "  - Average Packet Loss    : %.2f %%\n", final_report.avg_packet_loss);
     fprintf(fp, "  - Average Throughput     : %.2f B/s\n", final_report.avg_throughput);
     fprintf(fp, "  - Average CPU Usage      : %.2f %%\n", final_report.avg_cpu_usage);
     fprintf(fp, "  - Average Memory Usage   : %.2f %%\n", final_report.avg_memory_usage);
     fprintf(fp, "-------------------------------------------------------\n");
     fprintf(fp, " PEAK HISTORICAL PERFORMANCE:\n");
-    fprintf(fp, "  - Max Latency Observed   : %d ms\n", final_report.max_latency);
-    fprintf(fp, "  - Min Latency Observed   : %d ms\n", final_report.min_latency);
+    fprintf(fp, "  - Max Latency Observed   : %d us\n", final_report.max_latency);
+    fprintf(fp, "  - Min Latency Observed   : %d us\n", final_report.min_latency);
     
         fprintf(fp, "  - Peak Throughput        : %ld B/s\n", final_report.max_throughput);
     fprintf(fp, "=======================================================\n\n\n");

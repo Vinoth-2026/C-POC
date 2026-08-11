@@ -114,7 +114,9 @@ directories:
 # "NOT EXECUTED - TOOL UNAVAILABLE" message instead of silently skipping or
 # fabricating a result, per project verification policy.
 
-valgrind: all
+valgrind:
+	@$(MAKE) clean >/dev/null
+	@$(MAKE) all
 	@if command -v valgrind >/dev/null 2>&1; then \
 		echo "--- Valgrind Memcheck: $(TARGET_APP) ---"; \
 		printf 'vinoth\n12345\n4\n' | valgrind --leak-check=full --show-leak-kinds=all \
@@ -123,7 +125,9 @@ valgrind: all
 		echo "NOT EXECUTED - TOOL UNAVAILABLE (valgrind)"; \
 	fi
 
-helgrind: all
+helgrind:
+	@$(MAKE) clean >/dev/null
+	@$(MAKE) all
 	@if command -v valgrind >/dev/null 2>&1; then \
 		echo "--- Helgrind: $(TARGET_APP) ---"; \
 		printf 'vinoth\n12345\n4\n' | valgrind --tool=helgrind ./$(TARGET_APP); \
@@ -133,7 +137,10 @@ helgrind: all
 
 cppcheck:
 	@if command -v cppcheck >/dev/null 2>&1; then \
-		cppcheck --enable=all --std=c11 --inconclusive --force -I$(INC_DIR) $(SRC_DIR); \
+		cppcheck --enable=all --std=c11 --inconclusive --force \
+			--check-level=exhaustive \
+			--suppress=missingIncludeSystem \
+			-I$(INC_DIR) $(SRC_DIR); \
 	else \
 		echo "NOT EXECUTED - TOOL UNAVAILABLE (cppcheck)"; \
 	fi
@@ -143,10 +150,18 @@ coverage:
 		$(MAKE) clean >/dev/null; \
 		$(MAKE) test CFLAGS="$(CFLAGS) --coverage" TEST_LDFLAGS="$(TEST_LDFLAGS) --coverage"; \
 		./$(TARGET_TEST); \
-		echo "--- gcov (note: DataCollection.c/KPI_Collection.c are exercised via"; \
-		echo "    whitebox #include in their tests, not as separate test objects,"; \
-		echo "    so gcov cannot attribute coverage to them here) ---"; \
-		gcov -o $(OBJ_DIR)/src src/Analytic.c src/ErrorLog.c src/Report.c src/login.c || true; \
+		echo "--- gcov (note: DataCollection.c/KPI_Collection.c/login.c/Report.c are"; \
+		echo "    exercised via whitebox #include in their tests, not as separate test"; \
+		echo "    objects, so gcov cannot attribute coverage to them here) ---"; \
+		gcov -o $(OBJ_DIR)/src src/Analytic.c src/ErrorLog.c || true; \
+		mkdir -p coverage-reports; \
+		mv -f *.gcov coverage-reports/ 2>/dev/null || true; \
+		$(MAKE) clean >/dev/null; \
+		echo "--- Rebuilding without --coverage instrumentation so later"; \
+		echo "    'make valgrind'/'make helgrind'/'make all' don't link against"; \
+		echo "    stale gcov-instrumented objects ---"; \
+		$(MAKE) all >/dev/null; \
+		echo "gcov reports saved under coverage-reports/ (survives the rebuild above)."; \
 	else \
 		echo "NOT EXECUTED - TOOL UNAVAILABLE (gcov)"; \
 	fi

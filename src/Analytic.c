@@ -22,7 +22,7 @@ void analyze_latest_record(const Record *R)
      * signed/unsigned mixing). */
     if ((U32)R->latency > LATENCY_SLA_THRESHOLD)
     {
-        printf("[ALERT] Latency Breach: %d ms (Threshold: >%u ms)\n",
+        printf("[ALERT] Latency Breach: %d us (Threshold: >%u us)\n",
                R->latency, LATENCY_SLA_THRESHOLD);
     }
 
